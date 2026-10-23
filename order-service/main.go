@@ -20,13 +20,21 @@ func healthHandler(w http.ResponseWriter, r *http.Request) {
 	}
 }
 
+func loggingMiddleware(next http.Handler) http.Handler {
+	return http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		log.Printf("%s %s", r.Method, r.URL.Path)
+		next.ServeHTTP(w, r)
+	})
+}
+
 func main() {
 	mux := http.NewServeMux()
 	mux.HandleFunc("GET /health", healthHandler)
 
-	log.Println("Order service listening on port:8080")
+	handler := loggingMiddleware(mux)
 
-	if err := http.ListenAndServe(":8080", mux); err != nil {
+	log.Println("Order service listening on port:8080")
+	if err := http.ListenAndServe(":8080", handler); err != nil {
 		log.Fatal(err)
 	}
 }
