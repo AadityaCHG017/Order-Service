@@ -1,0 +1,16 @@
+
+# Environment variables and secrets
+.env
+.env.*
+!.env.example
+
+# macOS
+.DS_Store
+
+# Go build artifacts
+*.exe
+*.test
+*.out
+coverage.out
+bin/
+dist/
