@@ -4,6 +4,7 @@ import (
 	"encoding/json"
 	"log"
 	"net/http"
+	"context"
 )
 
 func healthHandler(w http.ResponseWriter, r *http.Request) {
@@ -28,13 +29,21 @@ func loggingMiddleware(next http.Handler) http.Handler {
 }
 
 func main() {
-	mux := http.NewServeMux()
-	mux.HandleFunc("GET /health", healthHandler)
+    ctx := context.Background()
 
-	handler := loggingMiddleware(mux)
+    pool, err := newDBPool(ctx)
+    if err != nil {
+        log.Fatal(err)
+    }
+    defer pool.Close()
 
-	log.Println("Order service listening on port:8080")
-	if err := http.ListenAndServe(":8080", handler); err != nil {
-		log.Fatal(err)
-	}
+    mux := http.NewServeMux()
+    mux.HandleFunc("GET /health", healthHandler)
+
+    handler := loggingMiddleware(mux)
+
+    log.Println("Order service listening on port:8080")
+    if err := http.ListenAndServe(":8080", handler); err != nil {
+        log.Fatal(err)
+    }
 }
