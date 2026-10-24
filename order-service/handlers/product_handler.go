@@ -5,6 +5,7 @@ import (
 	"ecommerce-order-management/order-service/models"
 	"ecommerce-order-management/order-service/repository"
 	"encoding/json"
+	"log"
 	"net/http"
 	"time"
 )
@@ -19,7 +20,6 @@ func NewProducthandler(repo *repository.ProductRepository) *ProductHandler {
 	}
 }
 func (h *ProductHandler) CreateProduct(w http.ResponseWriter, r *http.Request) {
-	// Parse the request body to get product details
 	var product models.Product
 
 	if err := json.NewDecoder(r.Body).Decode(&product); err != nil {
@@ -36,6 +36,7 @@ func (h *ProductHandler) CreateProduct(w http.ResponseWriter, r *http.Request) {
 	defer cancel()
 
 	if err := h.Repo.Create(ctx, &product); err != nil {
+		log.Printf("Create product failed: %v", err)
 		http.Error(w, "Failed to create Product", http.StatusInternalServerError)
 		return
 	}

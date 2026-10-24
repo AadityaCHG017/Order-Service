@@ -22,7 +22,7 @@ func (r *ProductRepository) Create(
 	product *models.Product,
 ) error {
 	query := `
-	INSET INTO Products(name, description, price, stock)
+	INSERT INTO Products(name, description, price, stock)
 	VALUES($1,$2,$3,$4)
 	RETURNING id, created_at
 	`
@@ -42,4 +42,34 @@ func (r *ProductRepository) Create(
 		return err
 	}
 	return nil
+}
+
+func (r *ProductRepository) GetAll(ctx context.Context) ([]models.Product, error) {
+	query := `SELECT id,name,description,price,stock,created_at FROM Products ORDER BY id`
+
+	rows, err := r.DB.Query(ctx, query)
+	if err != nil {
+		return nil, err
+	}
+	defer rows.Close()
+
+	var products []models.Product
+	for rows.Next() {
+		var product models.Product
+		if err := rows.Scan(
+			&product.ID,
+			&product.Name,
+			&product.Description,
+			&product.Price,
+			&product.Stock,
+			&product.CreatedAt,
+		); err != nil {
+			return nil, err
+		}
+		products = append(products, product)
+	}
+	if err := rows.Err(); err != nil {
+		return nil, err
+	}
+	return products, nil
 }

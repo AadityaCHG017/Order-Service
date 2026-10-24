@@ -1,10 +1,12 @@
 package main
 
 import (
+	"context"
+	"ecommerce-order-management/order-service/handlers"
+	"ecommerce-order-management/order-service/repository"
 	"encoding/json"
 	"log"
 	"net/http"
-	"context"
 )
 
 func healthHandler(w http.ResponseWriter, r *http.Request) {
@@ -29,21 +31,25 @@ func loggingMiddleware(next http.Handler) http.Handler {
 }
 
 func main() {
-    ctx := context.Background()
+	ctx := context.Background()
 
-    pool, err := newDBPool(ctx)
-    if err != nil {
-        log.Fatal(err)
-    }
-    defer pool.Close()
+	pool, err := newDBPool(ctx)
+	if err != nil {
+		log.Fatal(err)
+	}
+	defer pool.Close()
 
-    mux := http.NewServeMux()
-    mux.HandleFunc("GET /health", healthHandler)
+	productRepo := repository.NewProductRepository(pool)
+	productHandler := handlers.NewProducthandler(productRepo)
 
-    handler := loggingMiddleware(mux)
+	mux := http.NewServeMux()
+	mux.HandleFunc("GET /health", healthHandler)
+	mux.HandleFunc("POST /products", productHandler.CreateProduct)
 
-    log.Println("Order service listening on port:8080")
-    if err := http.ListenAndServe(":8080", handler); err != nil {
-        log.Fatal(err)
-    }
+	handler := loggingMiddleware(mux)
+
+	log.Println("Order service listening on port:8080")
+	if err := http.ListenAndServe(":8080", handler); err != nil {
+		log.Fatal(err)
+	}
 }
