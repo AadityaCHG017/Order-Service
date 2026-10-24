@@ -49,3 +49,19 @@ func (h *ProductHandler) CreateProduct(w http.ResponseWriter, r *http.Request) {
 	}
 
 }
+func (h *ProductHandler) GetAllProducts(w http.ResponseWriter, r *http.Request) {
+	ctx, cancel := context.WithTimeout(r.Context(), 5*time.Second)
+	defer cancel()
+
+	products, err := h.Repo.GetAll(ctx)
+	if err != nil {
+		http.Error(w, "Failed to fetch products", http.StatusInternalServerError)
+		return
+	}
+	w.Header().Set("Content-Type", "application/json")
+	w.WriteHeader(http.StatusCreated)
+
+	if err := json.NewEncoder(w).Encode(products); err != nil {
+		return
+	}
+}
