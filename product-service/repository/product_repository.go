@@ -2,8 +2,9 @@ package repository
 
 import (
 	"context"
-	"ecommerce-order-management/order-service/models"
+	"ecommerce-order-management/product-service/models"
 
+	"github.com/jackc/pgx/v5"
 	"github.com/jackc/pgx/v5/pgxpool"
 )
 
@@ -93,4 +94,56 @@ func (r *ProductRepository) GetByID(ctx context.Context, id int64) (*models.Prod
 	}
 	return &product, nil
 
+}
+
+func (r *ProductRepository) Update(
+	ctx context.Context,
+	product *models.Product,
+) error {
+	query := `
+		UPDATE products
+		SET name = $1,
+		    description = $2,
+		    price = $3,
+		    stock = $4
+		WHERE id = $5
+		RETURNING id, name, description, price, stock, created_at
+	`
+
+	err := r.DB.QueryRow(
+		ctx,
+		query,
+		product.Name,
+		product.Description,
+		product.Price,
+		product.Stock,
+		product.ID,
+	).Scan(
+		&product.ID,
+		&product.Name,
+		&product.Description,
+		&product.Price,
+		&product.Stock,
+		&product.CreatedAt,
+	)
+	if err != nil {
+		return err
+	}
+
+	return nil
+}
+
+func (r *ProductRepository) Delete(ctx context.Context, id int64) error {
+	query := `DELETE FROM products WHERE id = $1`
+
+	tag, err := r.DB.Exec(ctx, query, id)
+	if err != nil {
+		return err
+	}
+
+	if tag.RowsAffected() == 0 {
+		return pgx.ErrNoRows
+	}
+
+	return nil
 }

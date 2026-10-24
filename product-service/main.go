@@ -2,8 +2,8 @@ package main
 
 import (
 	"context"
-	"ecommerce-order-management/order-service/handlers"
-	"ecommerce-order-management/order-service/repository"
+	"ecommerce-order-management/product-service/handlers"
+	"ecommerce-order-management/product-service/repository"
 	"encoding/json"
 	"log"
 	"net/http"
@@ -46,7 +46,9 @@ func main() {
 	mux.HandleFunc("GET /health", healthHandler)
 	mux.HandleFunc("POST /products", productHandler.CreateProduct)
 	mux.HandleFunc("GET /products", productHandler.GetAllProducts)
+	mux.HandleFunc("PUT /products/{id}", productHandler.UpdateProduct)
 	mux.HandleFunc("GET /products/{id}", productHandler.GetProductByID)
+	mux.HandleFunc("DELETE /products/{id}", productHandler.DeleteProduct)
 
 	handler := loggingMiddleware(mux)
 

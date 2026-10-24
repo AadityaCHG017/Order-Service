@@ -1,4 +1,4 @@
-module ecommerce-order-management/order-service
+module ecommerce-order-management/product-service
 
 go 1.27.0
 
