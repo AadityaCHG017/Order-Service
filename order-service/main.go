@@ -2,6 +2,8 @@ package main
 
 import (
 	"context"
+	"ecommerce-order-management/order-service/handlers"
+	"ecommerce-order-management/order-service/repository"
 	"encoding/json"
 	"log"
 	"net/http"
@@ -38,13 +40,18 @@ func main() {
 	}
 	log.Println("Connected to PostgreSQL")
 	defer pool.Close()
+	orderRepo := repository.NewOrderRepository(pool)
+	orderHandler := handlers.NewOrderHandler(orderRepo)
 
 	mux := http.NewServeMux()
 	mux.HandleFunc("GET /health", healthHandler)
+	mux.HandleFunc("POST /orders", orderHandler.Create)
+	mux.HandleFunc("GET /orders", orderHandler.GetAllOrders)
+	mux.HandleFunc("GET /orders/{id}", orderHandler.GetOrderByID)
 
 	handler := loggingMiddleware(mux)
-	log.Println("Order service listening on port:8080")
-	if err := http.ListenAndServe(":8080", handler); err != nil {
+	log.Println("Order service listening on port:8081")
+	if err := http.ListenAndServe(":8081", handler); err != nil {
 		log.Fatal(err)
 	}
 }
