@@ -48,6 +48,8 @@ func main() {
 	mux.HandleFunc("POST /orders", orderHandler.Create)
 	mux.HandleFunc("GET /orders", orderHandler.GetAllOrders)
 	mux.HandleFunc("GET /orders/{id}", orderHandler.GetOrderByID)
+	mux.HandleFunc("PUT /orders/{id}", orderHandler.Update)
+	mux.HandleFunc("PATCH /orders/{id}/cancel", orderHandler.Cancel)
 
 	handler := loggingMiddleware(mux)
 	log.Println("Order service listening on port:8081")

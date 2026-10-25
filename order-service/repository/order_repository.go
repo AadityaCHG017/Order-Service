@@ -3,9 +3,16 @@ package repository
 import (
 	"context"
 	"ecommerce-order-management/order-service/models"
+	"errors"
 	"fmt"
 
+	"github.com/jackc/pgx/v5"
 	"github.com/jackc/pgx/v5/pgxpool"
+)
+
+var (
+	ErrOrderNotFound          = errors.New("order not found")
+	ErrOrderCannotBeCancelled = errors.New("order cannot be cancelled")
 )
 
 type OrderRepository struct {
@@ -201,6 +208,132 @@ func (r *OrderRepository) GetByID(ctx context.Context, id int64) (*models.Order,
 
 	if err := itemRows.Err(); err != nil {
 		return nil, err
+	}
+
+	return &order, nil
+}
+func (r *OrderRepository) UpdateItems(ctx context.Context, orderID int64, items []models.OrderItem) (*models.Order, error) {
+	if len(items) == 0 {
+		return nil, fmt.Errorf("order must contain at least one item")
+	}
+
+	var total float64
+	for _, item := range items {
+		if item.ProductID <= 0 || item.Quantity <= 0 || item.UnitPrice < 0 {
+			return nil, fmt.Errorf("invalid order item")
+		}
+		total += float64(item.Quantity) * item.UnitPrice
+	}
+
+	tx, err := r.DB.Begin(ctx)
+	if err != nil {
+		return nil, fmt.Errorf("begin transaction: %w", err)
+	}
+	defer tx.Rollback(ctx)
+
+	var order models.Order
+
+	err = tx.QueryRow(ctx, `
+        UPDATE orders
+        SET total_amount = $1, updated_at = NOW()
+        WHERE id = $2 AND status = 'pending'
+        RETURNING id, customer_id, status, total_amount, created_at, updated_at
+    `, total, orderID).Scan(
+		&order.ID,
+		&order.CustomerID,
+		&order.Status,
+		&order.TotalAmount,
+		&order.CreatedAt,
+		&order.UpdatedAt,
+	)
+	if err != nil {
+		return nil, err
+	}
+
+	_, err = tx.Exec(ctx, `DELETE FROM order_items WHERE order_id = $1`, orderID)
+	if err != nil {
+		return nil, fmt.Errorf("delete old order items: %w", err)
+	}
+
+	order.Items = make([]models.OrderItem, 0, len(items))
+
+	for _, item := range items {
+		var savedItem models.OrderItem
+
+		err = tx.QueryRow(ctx, `
+            INSERT INTO order_items (order_id, product_id, quantity, unit_price)
+            VALUES ($1, $2, $3, $4)
+            RETURNING id, order_id, product_id, quantity, unit_price, created_at
+        `, orderID, item.ProductID, item.Quantity, item.UnitPrice).Scan(
+			&savedItem.ID,
+			&savedItem.OrderID,
+			&savedItem.ProductID,
+			&savedItem.Quantity,
+			&savedItem.UnitPrice,
+			&savedItem.CreatedAt,
+		)
+		if err != nil {
+			return nil, fmt.Errorf("insert updated order item: %w", err)
+		}
+
+		order.Items = append(order.Items, savedItem)
+	}
+
+	if err := tx.Commit(ctx); err != nil {
+		return nil, fmt.Errorf("commit order update: %w", err)
+	}
+
+	return &order, nil
+}
+func (r *OrderRepository) Cancel(
+	ctx context.Context,
+	orderID int64,
+) (*models.Order, error) {
+	var order models.Order
+
+	err := r.DB.QueryRow(ctx, `
+        SELECT id, customer_id, status, total_amount, created_at, updated_at
+        FROM orders
+        WHERE id = $1
+    `, orderID).Scan(
+		&order.ID,
+		&order.CustomerID,
+		&order.Status,
+		&order.TotalAmount,
+		&order.CreatedAt,
+		&order.UpdatedAt,
+	)
+
+	if errors.Is(err, pgx.ErrNoRows) {
+		return nil, ErrOrderNotFound
+	}
+	if err != nil {
+		return nil, fmt.Errorf("find order: %w", err)
+	}
+
+	if order.Status != "pending" && order.Status != "confirmed" {
+		return nil, ErrOrderCannotBeCancelled
+	}
+
+	err = r.DB.QueryRow(ctx, `
+        UPDATE orders
+        SET status = 'cancelled', updated_at = NOW()
+        WHERE id = $1 AND status IN ('pending', 'confirmed')
+        RETURNING id, customer_id, status, total_amount, created_at, updated_at
+    `, orderID).Scan(
+		&order.ID,
+		&order.CustomerID,
+		&order.Status,
+		&order.TotalAmount,
+		&order.CreatedAt,
+		&order.UpdatedAt,
+	)
+
+	if errors.Is(err, pgx.ErrNoRows) {
+		return nil, ErrOrderCannotBeCancelled
+	}
+	if err != nil {
+		return nil, fmt.Errorf("cancel order: %w", err)
 	}
 
 	return &order, nil
