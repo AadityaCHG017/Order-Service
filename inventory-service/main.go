@@ -2,54 +2,57 @@ package main
 
 import (
 	"context"
-	"ecommerce-order-management/inventory-service/handlers"
-	"ecommerce-order-management/inventory-service/repository"
 	"encoding/json"
 	"log"
 	"net/http"
+	"time"
+
+	"ecommerce-order-management/inventory-service/handlers"
+	"ecommerce-order-management/inventory-service/repository"
 )
 
-func healthHandler(w http.ResponseWriter, r *http.Request) {
-	w.Header().Set("Content-Type", "application/json")
-	w.WriteHeader(http.StatusOK)
-
-	response := map[string]string{
-		"status":  "ok",
-		"service": "inventory-service",
-	}
-	if err := json.NewEncoder(w).Encode(response); err != nil {
-		log.Printf("Failed to encode health response: %v", err)
-	}
-}
-
-func loggingMiddleware(next http.Handler) http.Handler {
-	return http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
-		log.Printf("%s %s", r.Method, r.URL.Path)
-		next.ServeHTTP(w, r)
-	})
-}
 func main() {
 	ctx := context.Background()
 
 	pool, err := newDBPool(ctx)
 	if err != nil {
-		log.Fatal(err)
+		log.Fatalf("Failed to connect to database: %v", err)
 	}
-	log.Println("Connected to PostgreSQL")
 	defer pool.Close()
 
-	mux := http.NewServeMux()
 	inventoryRepo := repository.NewInventoryRepository(pool)
 	inventoryHandler := handlers.NewInventoryHandler(inventoryRepo)
 
+	mux := http.NewServeMux()
+
+	mux.HandleFunc("GET /health", healthHandler)
 	mux.HandleFunc("POST /inventory", inventoryHandler.Create)
 	mux.HandleFunc("GET /inventory/{product_id}", inventoryHandler.GetByProductID)
+	mux.HandleFunc("PATCH /inventory/{product_id}", inventoryHandler.UpdateQuantity)
+	mux.HandleFunc("DELETE /inventory/{product_id}", inventoryHandler.Delete)
+	mux.HandleFunc("POST /inventory/{product_id}/reserve", inventoryHandler.Reserve)
+	mux.HandleFunc("POST /inventory/{product_id}/release", inventoryHandler.Release)
+	mux.HandleFunc("POST /inventory/{product_id}/commit", inventoryHandler.Commit)
 
-	handler := loggingMiddleware(mux)
-	mux.HandleFunc("GET /health", healthHandler)
-
-	log.Println("Inventory service listening on port:8082")
-	if err := http.ListenAndServe(":8082", handler); err != nil {
-		log.Fatal(err)
+	server := &http.Server{
+		Addr:              ":8082",
+		Handler:           mux,
+		ReadHeaderTimeout: 5 * time.Second,
 	}
+
+	log.Println("Inventory service listening on port 8082")
+
+	if err := server.ListenAndServe(); err != nil && err != http.ErrServerClosed {
+		log.Fatalf("Inventory service failed: %v", err)
+	}
+}
+
+func healthHandler(w http.ResponseWriter, r *http.Request) {
+	w.Header().Set("Content-Type", "application/json")
+	w.WriteHeader(http.StatusOK)
+
+	_ = json.NewEncoder(w).Encode(map[string]string{
+		"service": "inventory-service",
+		"status":  "ok",
+	})
 }
