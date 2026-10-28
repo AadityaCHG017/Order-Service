@@ -40,7 +40,7 @@ func main() {
 	handler := loggingMiddleware(mux)
 	mux.HandleFunc("GET /health", healthHandler)
 
-	log.Println("Order service listening on port:8082")
+	log.Println("Inventory service listening on port:8082")
 	if err := http.ListenAndServe(":8082", handler); err != nil {
 		log.Fatal(err)
 	}
