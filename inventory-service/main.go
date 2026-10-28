@@ -16,7 +16,7 @@ func healthHandler(w http.ResponseWriter, r *http.Request) {
 		"service": "inventory-service",
 	}
 	if err := json.NewEncoder(w).Encode(response); err != nil {
-		log.Printf("Failed to encode health response: %w", err)
+		log.Printf("Failed to encode health response: %v", err)
 	}
 }
 
