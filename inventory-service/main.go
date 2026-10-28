@@ -2,6 +2,8 @@ package main
 
 import (
 	"context"
+	"ecommerce-order-management/inventory-service/handlers"
+	"ecommerce-order-management/inventory-service/repository"
 	"encoding/json"
 	"log"
 	"net/http"
@@ -37,6 +39,12 @@ func main() {
 	defer pool.Close()
 
 	mux := http.NewServeMux()
+	inventoryRepo := repository.NewInventoryRepository(pool)
+	inventoryHandler := handlers.NewInventoryHandler(inventoryRepo)
+
+	mux.HandleFunc("POST /inventory", inventoryHandler.Create)
+	mux.HandleFunc("GET /inventory/{product_id}", inventoryHandler.GetByProductID)
+
 	handler := loggingMiddleware(mux)
 	mux.HandleFunc("GET /health", healthHandler)
 

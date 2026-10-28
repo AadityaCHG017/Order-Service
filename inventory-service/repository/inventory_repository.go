@@ -42,3 +42,28 @@ func (r *InventoryRepository) Create(ctx context.Context, inventory *models.Inve
 
 	return nil
 }
+
+func (r *InventoryRepository) GetByProductID(ctx context.Context, productID int64) (*models.Inventory, error) {
+	var inventory models.Inventory
+
+	query := `
+		SELECT id, product_id, quantity, reserved_quantity, updated_at
+		FROM inventory
+		WHERE product_id = $1
+	`
+
+	err := r.DB.QueryRow(ctx, query, productID).Scan(
+		&inventory.ID,
+		&inventory.ProductID,
+		&inventory.Quantity,
+		&inventory.ReservedQuantity,
+		&inventory.UpdatedAt,
+	)
+	if err != nil {
+		return nil, fmt.Errorf("get inventory by product ID: %w", err)
+	}
+
+	inventory.AvailableStock = inventory.Quantity - inventory.ReservedQuantity
+
+	return &inventory, nil
+}

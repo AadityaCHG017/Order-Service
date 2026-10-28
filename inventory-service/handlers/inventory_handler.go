@@ -2,10 +2,14 @@ package handlers
 
 import (
 	"encoding/json"
+	"errors"
 	"net/http"
+	"strconv"
 
 	"ecommerce-order-management/inventory-service/models"
 	"ecommerce-order-management/inventory-service/repository"
+
+	"github.com/jackc/pgx/v5"
 )
 
 type InventoryHandler struct {
@@ -44,6 +48,31 @@ func (h *InventoryHandler) Create(w http.ResponseWriter, r *http.Request) {
 
 	w.Header().Set("Content-Type", "application/json")
 	w.WriteHeader(http.StatusCreated)
+
+	if err := json.NewEncoder(w).Encode(inventory); err != nil {
+		return
+	}
+}
+
+func (h *InventoryHandler) GetByProductID(w http.ResponseWriter, r *http.Request) {
+	productID, err := strconv.ParseInt(r.PathValue("product_id"), 10, 64)
+	if err != nil || productID <= 0 {
+		http.Error(w, "Invalid product ID", http.StatusBadRequest)
+		return
+	}
+
+	inventory, err := h.Repo.GetByProductID(r.Context(), productID)
+	if errors.Is(err, pgx.ErrNoRows) {
+		http.Error(w, "Inventory not found", http.StatusNotFound)
+		return
+	}
+	if err != nil {
+		http.Error(w, "Failed to retrieve inventory", http.StatusInternalServerError)
+		return
+	}
+
+	w.Header().Set("Content-Type", "application/json")
+	w.WriteHeader(http.StatusOK)
 
 	if err := json.NewEncoder(w).Encode(inventory); err != nil {
 		return
