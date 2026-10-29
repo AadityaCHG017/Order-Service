@@ -2,6 +2,7 @@ package main
 
 import (
 	"context"
+	"ecommerce-order-management/order-service/grpcclient"
 	"ecommerce-order-management/order-service/handlers"
 	"ecommerce-order-management/order-service/repository"
 	"encoding/json"
@@ -41,8 +42,14 @@ func main() {
 	log.Println("Connected to PostgreSQL")
 	defer pool.Close()
 	orderRepo := repository.NewOrderRepository(pool)
-	orderHandler := handlers.NewOrderHandler(orderRepo)
 
+	inventoryClient, err := grpcclient.NewInventoryClient("localhost:9092")
+	if err != nil {
+		log.Fatalf("Failed to create inventory client: %v", err)
+	}
+	defer inventoryClient.Close()
+
+	orderHandler := handlers.NewOrderHandler(orderRepo, inventoryClient)
 	mux := http.NewServeMux()
 	mux.HandleFunc("GET /health", healthHandler)
 	mux.HandleFunc("POST /orders", orderHandler.Create)

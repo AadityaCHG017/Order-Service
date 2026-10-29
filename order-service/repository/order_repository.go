@@ -285,16 +285,20 @@ func (r *OrderRepository) UpdateItems(ctx context.Context, orderID int64, items 
 
 	return &order, nil
 }
-func (r *OrderRepository) Cancel(
-	ctx context.Context,
-	orderID int64,
-) (*models.Order, error) {
+func (r *OrderRepository) Cancel(ctx context.Context, orderID int64) (*models.Order, error) {
+	tx, err := r.DB.Begin(ctx)
+	if err != nil {
+		return nil, fmt.Errorf("begin cancellation transaction: %w", err)
+	}
+	defer tx.Rollback(ctx)
+
 	var order models.Order
 
-	err := r.DB.QueryRow(ctx, `
+	err = tx.QueryRow(ctx, `
         SELECT id, customer_id, status, total_amount, created_at, updated_at
         FROM orders
         WHERE id = $1
+        FOR UPDATE
     `, orderID).Scan(
 		&order.ID,
 		&order.CustomerID,
@@ -315,10 +319,10 @@ func (r *OrderRepository) Cancel(
 		return nil, ErrOrderCannotBeCancelled
 	}
 
-	err = r.DB.QueryRow(ctx, `
+	err = tx.QueryRow(ctx, `
         UPDATE orders
         SET status = 'cancelled', updated_at = NOW()
-        WHERE id = $1 AND status IN ('pending', 'confirmed')
+        WHERE id = $1
         RETURNING id, customer_id, status, total_amount, created_at, updated_at
     `, orderID).Scan(
 		&order.ID,
@@ -328,13 +332,133 @@ func (r *OrderRepository) Cancel(
 		&order.CreatedAt,
 		&order.UpdatedAt,
 	)
-
-	if errors.Is(err, pgx.ErrNoRows) {
-		return nil, ErrOrderCannotBeCancelled
-	}
 	if err != nil {
 		return nil, fmt.Errorf("cancel order: %w", err)
 	}
 
+	if err := tx.Commit(ctx); err != nil {
+		return nil, fmt.Errorf("commit cancellation: %w", err)
+	}
+
 	return &order, nil
+}
+
+func (r *OrderRepository) StartCancellation(ctx context.Context, orderID int64) (*models.Order, string, error) {
+	tx, err := r.DB.Begin(ctx)
+	if err != nil {
+		return nil, "", fmt.Errorf("begin cancellation: %w", err)
+	}
+	defer tx.Rollback(ctx)
+
+	var order models.Order
+	var originalStatus string
+
+	err = tx.QueryRow(ctx, `
+        SELECT id, customer_id, status, total_amount,
+               created_at, updated_at
+        FROM orders
+        WHERE id = $1
+        FOR UPDATE
+    `, orderID).Scan(
+		&order.ID,
+		&order.CustomerID,
+		&originalStatus,
+		&order.TotalAmount,
+		&order.CreatedAt,
+		&order.UpdatedAt,
+	)
+
+	if errors.Is(err, pgx.ErrNoRows) {
+		return nil, "", ErrOrderNotFound
+	}
+	if err != nil {
+		return nil, "", fmt.Errorf("find order: %w", err)
+	}
+
+	if originalStatus != "pending" && originalStatus != "confirmed" {
+		return nil, "", ErrOrderCannotBeCancelled
+	}
+
+	_, err = tx.Exec(ctx, `
+        UPDATE orders
+        SET status = 'cancelling', updated_at = NOW()
+        WHERE id = $1
+    `, orderID)
+	if err != nil {
+		return nil, "", fmt.Errorf("start cancellation: %w", err)
+	}
+
+	itemRows, err := tx.Query(ctx, `
+        SELECT id, order_id, product_id, quantity,
+               unit_price, created_at
+        FROM order_items
+        WHERE order_id = $1
+        ORDER BY id
+    `, orderID)
+	if err != nil {
+		return nil, "", fmt.Errorf("load order items: %w", err)
+	}
+
+	for itemRows.Next() {
+		var item models.OrderItem
+		if err := itemRows.Scan(
+			&item.ID,
+			&item.OrderID,
+			&item.ProductID,
+			&item.Quantity,
+			&item.UnitPrice,
+			&item.CreatedAt,
+		); err != nil {
+			itemRows.Close()
+			return nil, "", fmt.Errorf("scan order item: %w", err)
+		}
+		order.Items = append(order.Items, item)
+	}
+
+	rowsErr := itemRows.Err()
+	itemRows.Close()
+	if rowsErr != nil {
+		return nil, "", fmt.Errorf("read order items: %w", rowsErr)
+	}
+
+	if err := tx.Commit(ctx); err != nil {
+		return nil, "", fmt.Errorf("commit cancellation start: %w", err)
+	}
+
+	order.Status = "cancelling"
+	return &order, originalStatus, nil
+}
+
+func (r *OrderRepository) CompleteCancellation(ctx context.Context, orderID int64) error {
+	result, err := r.DB.Exec(ctx, `
+        UPDATE orders
+        SET status = 'cancelled', updated_at = NOW()
+        WHERE id = $1 AND status = 'cancelling'
+    `, orderID)
+	if err != nil {
+		return fmt.Errorf("complete cancellation: %w", err)
+	}
+	if result.RowsAffected() != 1 {
+		return fmt.Errorf("order is not in cancelling status")
+	}
+	return nil
+}
+
+func (r *OrderRepository) RestoreCancellation(ctx context.Context, orderID int64, originalStatus string) error {
+	if originalStatus != "pending" && originalStatus != "confirmed" {
+		return fmt.Errorf("invalid original order status")
+	}
+
+	result, err := r.DB.Exec(ctx, `
+        UPDATE orders
+        SET status = $1, updated_at = NOW()
+        WHERE id = $2 AND status = 'cancelling'
+    `, originalStatus, orderID)
+	if err != nil {
+		return fmt.Errorf("restore order status: %w", err)
+	}
+	if result.RowsAffected() != 1 {
+		return fmt.Errorf("order is not in cancelling status")
+	}
+	return nil
 }
