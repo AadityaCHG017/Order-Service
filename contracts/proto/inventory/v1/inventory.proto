@@ -4,9 +4,12 @@ package inventory.v1;
 
 option go_package = "ecommerce-order-management/contracts/gen/inventory/v1;inventoryv1";
 
-service InventoryService{
-    rpc ReserveStock(ReserveStockRequest)
-    returns(ReserveStockResponse);
+service InventoryService {
+  rpc ReserveStock(ReserveStockRequest)
+      returns (ReserveStockResponse);
+
+  rpc ReleaseStock(ReleaseStockRequest)
+      returns (ReleaseStockResponse);
 }
 message ReserveStockRequest {
   int64 product_id = 1;
@@ -15,5 +18,15 @@ message ReserveStockRequest {
 message ReserveStockResponse {
   int64 product_id = 1;
   int32 quantity_reserved = 2;
+  int32 available_stock = 3;
+}
+message ReleaseStockRequest {
+  int64 product_id = 1;
+  int32 quantity = 2;
+}
+
+message ReleaseStockResponse {
+  int64 product_id = 1;
+  int32 quantity_released = 2;
   int32 available_stock = 3;
 }

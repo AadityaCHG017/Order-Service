@@ -133,6 +133,118 @@ func (x *ReserveStockResponse) GetAvailableStock() int32 {
 	return 0
 }
 
+type ReleaseStockRequest struct {
+	state         protoimpl.MessageState `protogen:"open.v1"`
+	ProductId     int64                  `protobuf:"varint,1,opt,name=product_id,json=productId,proto3" json:"product_id,omitempty"`
+	Quantity      int32                  `protobuf:"varint,2,opt,name=quantity,proto3" json:"quantity,omitempty"`
+	unknownFields protoimpl.UnknownFields
+	sizeCache     protoimpl.SizeCache
+}
+
+func (x *ReleaseStockRequest) Reset() {
+	*x = ReleaseStockRequest{}
+	mi := &file_inventory_v1_inventory_proto_msgTypes[2]
+	ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
+	ms.StoreMessageInfo(mi)
+}
+
+func (x *ReleaseStockRequest) String() string {
+	return protoimpl.X.MessageStringOf(x)
+}
+
+func (*ReleaseStockRequest) ProtoMessage() {}
+
+func (x *ReleaseStockRequest) ProtoReflect() protoreflect.Message {
+	mi := &file_inventory_v1_inventory_proto_msgTypes[2]
+	if x != nil {
+		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
+		if ms.LoadMessageInfo() == nil {
+			ms.StoreMessageInfo(mi)
+		}
+		return ms
+	}
+	return mi.MessageOf(x)
+}
+
+// Deprecated: Use ReleaseStockRequest.ProtoReflect.Descriptor instead.
+func (*ReleaseStockRequest) Descriptor() ([]byte, []int) {
+	return file_inventory_v1_inventory_proto_rawDescGZIP(), []int{2}
+}
+
+func (x *ReleaseStockRequest) GetProductId() int64 {
+	if x != nil {
+		return x.ProductId
+	}
+	return 0
+}
+
+func (x *ReleaseStockRequest) GetQuantity() int32 {
+	if x != nil {
+		return x.Quantity
+	}
+	return 0
+}
+
+type ReleaseStockResponse struct {
+	state            protoimpl.MessageState `protogen:"open.v1"`
+	ProductId        int64                  `protobuf:"varint,1,opt,name=product_id,json=productId,proto3" json:"product_id,omitempty"`
+	QuantityReleased int32                  `protobuf:"varint,2,opt,name=quantity_released,json=quantityReleased,proto3" json:"quantity_released,omitempty"`
+	AvailableStock   int32                  `protobuf:"varint,3,opt,name=available_stock,json=availableStock,proto3" json:"available_stock,omitempty"`
+	unknownFields    protoimpl.UnknownFields
+	sizeCache        protoimpl.SizeCache
+}
+
+func (x *ReleaseStockResponse) Reset() {
+	*x = ReleaseStockResponse{}
+	mi := &file_inventory_v1_inventory_proto_msgTypes[3]
+	ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
+	ms.StoreMessageInfo(mi)
+}
+
+func (x *ReleaseStockResponse) String() string {
+	return protoimpl.X.MessageStringOf(x)
+}
+
+func (*ReleaseStockResponse) ProtoMessage() {}
+
+func (x *ReleaseStockResponse) ProtoReflect() protoreflect.Message {
+	mi := &file_inventory_v1_inventory_proto_msgTypes[3]
+	if x != nil {
+		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
+		if ms.LoadMessageInfo() == nil {
+			ms.StoreMessageInfo(mi)
+		}
+		return ms
+	}
+	return mi.MessageOf(x)
+}
+
+// Deprecated: Use ReleaseStockResponse.ProtoReflect.Descriptor instead.
+func (*ReleaseStockResponse) Descriptor() ([]byte, []int) {
+	return file_inventory_v1_inventory_proto_rawDescGZIP(), []int{3}
+}
+
+func (x *ReleaseStockResponse) GetProductId() int64 {
+	if x != nil {
+		return x.ProductId
+	}
+	return 0
+}
+
+func (x *ReleaseStockResponse) GetQuantityReleased() int32 {
+	if x != nil {
+		return x.QuantityReleased
+	}
+	return 0
+}
+
+func (x *ReleaseStockResponse) GetAvailableStock() int32 {
+	if x != nil {
+		return x.AvailableStock
+	}
+	return 0
+}
+
 var File_inventory_v1_inventory_proto protoreflect.FileDescriptor
 
 const file_inventory_v1_inventory_proto_rawDesc = "" +
@@ -146,9 +258,19 @@ const file_inventory_v1_inventory_proto_rawDesc = "" +
 	"\n" +
 	"product_id\x18\x01 \x01(\x03R\tproductId\x12+\n" +
 	"\x11quantity_reserved\x18\x02 \x01(\x05R\x10quantityReserved\x12'\n" +
-	"\x0favailable_stock\x18\x03 \x01(\x05R\x0eavailableStock2i\n" +
+	"\x0favailable_stock\x18\x03 \x01(\x05R\x0eavailableStock\"P\n" +
+	"\x13ReleaseStockRequest\x12\x1d\n" +
+	"\n" +
+	"product_id\x18\x01 \x01(\x03R\tproductId\x12\x1a\n" +
+	"\bquantity\x18\x02 \x01(\x05R\bquantity\"\x8b\x01\n" +
+	"\x14ReleaseStockResponse\x12\x1d\n" +
+	"\n" +
+	"product_id\x18\x01 \x01(\x03R\tproductId\x12+\n" +
+	"\x11quantity_released\x18\x02 \x01(\x05R\x10quantityReleased\x12'\n" +
+	"\x0favailable_stock\x18\x03 \x01(\x05R\x0eavailableStock2\xc0\x01\n" +
 	"\x10InventoryService\x12U\n" +
-	"\fReserveStock\x12!.inventory.v1.ReserveStockRequest\x1a\".inventory.v1.ReserveStockResponseBCZAecommerce-order-management/contracts/gen/inventory/v1;inventoryv1b\x06proto3"
+	"\fReserveStock\x12!.inventory.v1.ReserveStockRequest\x1a\".inventory.v1.ReserveStockResponse\x12U\n" +
+	"\fReleaseStock\x12!.inventory.v1.ReleaseStockRequest\x1a\".inventory.v1.ReleaseStockResponseBCZAecommerce-order-management/contracts/gen/inventory/v1;inventoryv1b\x06proto3"
 
 var (
 	file_inventory_v1_inventory_proto_rawDescOnce sync.Once
@@ -162,16 +284,20 @@ func file_inventory_v1_inventory_proto_rawDescGZIP() []byte {
 	return file_inventory_v1_inventory_proto_rawDescData
 }
 
-var file_inventory_v1_inventory_proto_msgTypes = make([]protoimpl.MessageInfo, 2)
+var file_inventory_v1_inventory_proto_msgTypes = make([]protoimpl.MessageInfo, 4)
 var file_inventory_v1_inventory_proto_goTypes = []any{
 	(*ReserveStockRequest)(nil),  // 0: inventory.v1.ReserveStockRequest
 	(*ReserveStockResponse)(nil), // 1: inventory.v1.ReserveStockResponse
+	(*ReleaseStockRequest)(nil),  // 2: inventory.v1.ReleaseStockRequest
+	(*ReleaseStockResponse)(nil), // 3: inventory.v1.ReleaseStockResponse
 }
 var file_inventory_v1_inventory_proto_depIdxs = []int32{
 	0, // 0: inventory.v1.InventoryService.ReserveStock:input_type -> inventory.v1.ReserveStockRequest
-	1, // 1: inventory.v1.InventoryService.ReserveStock:output_type -> inventory.v1.ReserveStockResponse
-	1, // [1:2] is the sub-list for method output_type
-	0, // [0:1] is the sub-list for method input_type
+	2, // 1: inventory.v1.InventoryService.ReleaseStock:input_type -> inventory.v1.ReleaseStockRequest
+	1, // 2: inventory.v1.InventoryService.ReserveStock:output_type -> inventory.v1.ReserveStockResponse
+	3, // 3: inventory.v1.InventoryService.ReleaseStock:output_type -> inventory.v1.ReleaseStockResponse
+	2, // [2:4] is the sub-list for method output_type
+	0, // [0:2] is the sub-list for method input_type
 	0, // [0:0] is the sub-list for extension type_name
 	0, // [0:0] is the sub-list for extension extendee
 	0, // [0:0] is the sub-list for field type_name
@@ -188,7 +314,7 @@ func file_inventory_v1_inventory_proto_init() {
 			GoPackagePath: reflect.TypeOf(x{}).PkgPath(),
 			RawDescriptor: unsafe.Slice(unsafe.StringData(file_inventory_v1_inventory_proto_rawDesc), len(file_inventory_v1_inventory_proto_rawDesc)),
 			NumEnums:      0,
-			NumMessages:   2,
+			NumMessages:   4,
 			NumExtensions: 0,
 			NumServices:   1,
 		},

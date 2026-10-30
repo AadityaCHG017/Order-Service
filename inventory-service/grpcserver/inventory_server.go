@@ -21,10 +21,7 @@ func NewInventoryServer(repo *repository.InventoryRepository) *InventoryServer {
 	}
 }
 
-func (s *InventoryServer) ReserveStock(
-	ctx context.Context,
-	req *inventoryv1.ReserveStockRequest,
-) (*inventoryv1.ReserveStockResponse, error) {
+func (s *InventoryServer) ReserveStock(ctx context.Context, req *inventoryv1.ReserveStockRequest) (*inventoryv1.ReserveStockResponse, error) {
 
 	if req == nil || req.GetProductId() <= 0 || req.GetQuantity() <= 0 {
 		return nil, status.Error(
@@ -55,6 +52,35 @@ func (s *InventoryServer) ReserveStock(
 	return &inventoryv1.ReserveStockResponse{
 		ProductId:        inventory.ProductID,
 		QuantityReserved: req.GetQuantity(),
+		AvailableStock:   int32(inventory.AvailableStock),
+	}, nil
+}
+func (s *InventoryServer) ReleaseStock(ctx context.Context, req *inventoryv1.ReleaseStockRequest) (*inventoryv1.ReleaseStockResponse, error) {
+	if req == nil || req.GetProductId() <= 0 || req.GetQuantity() <= 0 {
+		return nil, status.Error(
+			codes.InvalidArgument,
+			"product_id and quantity must be positive",
+		)
+	}
+
+	inventory, err := s.repo.Release(
+		ctx,
+		req.GetProductId(),
+		int(req.GetQuantity()),
+	)
+
+	if err != nil {
+		switch {
+		case err == repository.ErrInventoryNotFound:
+			return nil, status.Error(codes.NotFound, "inventory not found")
+		default:
+			return nil, status.Error(codes.FailedPrecondition, "failed to release stock")
+		}
+	}
+
+	return &inventoryv1.ReleaseStockResponse{
+		ProductId:        inventory.ProductID,
+		QuantityReleased: req.GetQuantity(),
 		AvailableStock:   int32(inventory.AvailableStock),
 	}, nil
 }
