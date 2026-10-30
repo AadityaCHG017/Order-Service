@@ -212,7 +212,12 @@ func (r *OrderRepository) GetByID(ctx context.Context, id int64) (*models.Order,
 
 	return &order, nil
 }
-func (r *OrderRepository) UpdateItems(ctx context.Context, orderID int64, items []models.OrderItem) (*models.Order, error) {
+func (r *OrderRepository) UpdateItems(
+	ctx context.Context,
+	orderID int64,
+	lockID string,
+	items []models.OrderItem,
+) (*models.Order, error) {
 	if len(items) == 0 {
 		return nil, fmt.Errorf("order must contain at least one item")
 	}
@@ -236,9 +241,13 @@ func (r *OrderRepository) UpdateItems(ctx context.Context, orderID int64, items 
 	err = tx.QueryRow(ctx, `
         UPDATE orders
         SET total_amount = $1, updated_at = NOW()
-        WHERE id = $2 AND status = 'pending'
+        WHERE id = $2
+          AND status = 'pending'
+          AND is_updating = TRUE
+          AND update_lock_id = $3::uuid
+          AND update_lock_expires_at > NOW()
         RETURNING id, customer_id, status, total_amount, created_at, updated_at
-    `, total, orderID).Scan(
+    `, total, orderID, lockID).Scan(
 		&order.ID,
 		&order.CustomerID,
 		&order.Status,
@@ -247,7 +256,7 @@ func (r *OrderRepository) UpdateItems(ctx context.Context, orderID int64, items 
 		&order.UpdatedAt,
 	)
 	if err != nil {
-		return nil, err
+		return nil, fmt.Errorf("order update rejected or lock expired: %w", err)
 	}
 
 	_, err = tx.Exec(ctx, `DELETE FROM order_items WHERE order_id = $1`, orderID)
@@ -460,5 +469,90 @@ func (r *OrderRepository) RestoreCancellation(ctx context.Context, orderID int64
 	if result.RowsAffected() != 1 {
 		return fmt.Errorf("order is not in cancelling status")
 	}
+	return nil
+}
+
+func (r *OrderRepository) GetItemsByOrderID(ctx context.Context, orderID int64) ([]models.OrderItem, error) {
+	rows, err := r.DB.Query(ctx, `
+		SELECT id, order_id, product_id, quantity, unit_price, created_at
+		FROM order_items
+		WHERE order_id = $1
+		ORDER BY id
+	`, orderID)
+	if err != nil {
+		return nil, fmt.Errorf("get order items: %w", err)
+	}
+	defer rows.Close()
+
+	items := make([]models.OrderItem, 0)
+
+	for rows.Next() {
+		var item models.OrderItem
+
+		err := rows.Scan(
+			&item.ID,
+			&item.OrderID,
+			&item.ProductID,
+			&item.Quantity,
+			&item.UnitPrice,
+			&item.CreatedAt,
+		)
+		if err != nil {
+			return nil, fmt.Errorf("scan order item: %w", err)
+		}
+
+		items = append(items, item)
+	}
+
+	if err := rows.Err(); err != nil {
+		return nil, fmt.Errorf("iterate order items: %w", err)
+	}
+
+	return items, nil
+}
+func (r *OrderRepository) AcquireUpdateLock(ctx context.Context, orderID int64) (string, error) {
+	query := `
+		UPDATE orders
+		SET is_updating = TRUE,
+		    update_lock_id = gen_random_uuid(),
+		    update_lock_expires_at = NOW() + INTERVAL '60 seconds'
+		WHERE id = $1
+		  AND status = 'pending'
+		  AND (
+		      update_lock_id IS NULL
+		      OR update_lock_expires_at <= NOW()
+		  )
+		RETURNING update_lock_id::text
+	`
+
+	var lockID string
+
+	err := r.DB.QueryRow(ctx, query, orderID).Scan(&lockID)
+	if err != nil {
+		if errors.Is(err, pgx.ErrNoRows) {
+			return "", fmt.Errorf("order not found, not pending, or already updating")
+		}
+
+		return "", fmt.Errorf("acquire order update lock: %w", err)
+	}
+
+	return lockID, nil
+}
+
+func (r *OrderRepository) ReleaseUpdateLock(ctx context.Context, orderID int64, lockID string) error {
+	query := `
+		UPDATE orders
+		SET is_updating = FALSE,
+		    update_lock_id = NULL,
+		    update_lock_expires_at = NULL
+		WHERE id = $1
+		  AND update_lock_id = $2::uuid
+	`
+
+	_, err := r.DB.Exec(ctx, query, orderID, lockID)
+	if err != nil {
+		return fmt.Errorf("release order update lock: %w", err)
+	}
+
 	return nil
 }
