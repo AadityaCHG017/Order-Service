@@ -2,7 +2,7 @@ package handlers
 
 import (
 	"context"
-	"ecommerce-order-management/order-service/grpcclient"
+	inventoryv1 "ecommerce-order-management/contracts/gen/inventory/v1"
 	"ecommerce-order-management/order-service/models"
 	"ecommerce-order-management/order-service/repository"
 	"encoding/json"
@@ -17,14 +17,30 @@ import (
 	"google.golang.org/grpc/status"
 )
 
+type OrderRepository interface {
+	CreateWithItems(ctx context.Context, order *models.Order) error
+	GetAll(ctx context.Context) ([]models.Order, error)
+	GetByID(ctx context.Context, id int64) (*models.Order, error)
+	UpdateItems(ctx context.Context, orderID int64, items []models.OrderItem) (*models.Order, error)
+
+	StartCancellation(ctx context.Context, orderID int64) (*models.Order, string, error)
+	CompleteCancellation(ctx context.Context, orderID int64) error
+	RestoreCancellation(ctx context.Context, orderID int64, originalStatus string) error
+}
+
+type InventoryClient interface {
+	ReserveStock(ctx context.Context, productID int64, quantity int32) (*inventoryv1.ReserveStockResponse, error)
+	ReleaseStock(ctx context.Context, productID int64, quantity int32) (*inventoryv1.ReleaseStockResponse, error)
+}
+
 type OrderHandler struct {
-	Repo            *repository.OrderRepository
-	InventoryClient *grpcclient.InventoryClient
+	Repo            OrderRepository
+	InventoryClient InventoryClient
 }
 
 func NewOrderHandler(
-	repo *repository.OrderRepository,
-	inventoryClient *grpcclient.InventoryClient,
+	repo OrderRepository,
+	inventoryClient InventoryClient,
 ) *OrderHandler {
 	return &OrderHandler{
 		Repo:            repo,
